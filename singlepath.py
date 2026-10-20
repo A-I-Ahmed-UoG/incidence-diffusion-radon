@@ -5,11 +5,11 @@ Let N be the 0/1 support of A = M + alpha I and W = N^2 over Z, so that W(m,i)
 counts the cells j with A[m,j] A[j,i] != 0, the two-step walks from cell i to
 cell m.  Section 8.4 proves:
 
-  (P) if S is a set of cells such that every cell m has some i in S with
-      W(m,i) <= 1, then three rounds of the permutation sum to zero over the
-      p^|S| inputs that run through all values on S, whatever the S-boxes (as
-      long as they are permutations of F_p, one per cell and round), the round
-      constants and the values outside S;
+  (P) Proposition 8.6: if S is a set of cells such that every cell m has
+      some i in S with W(m,i) <= 1, then three rounds of the permutation sum
+      to zero over the p^|S| inputs that run through all values on S,
+      whatever the S-boxes (as long as they are permutations of F_p, one per
+      cell and round), the round constants and the values outside S;
 
   (B) W(m,i) >= 2 only if m lies in
           B(i) = L(i) u {i} u E(i),
@@ -19,15 +19,18 @@ cell m.  Section 8.4 proves:
   (C) in particular S = {(a,0), (a',0)} with a, a' distinct and non-zero
       satisfies (P), so three rounds are broken with p^2 inputs for every p.
 
-  (D) degree asymmetry: from a cell-aligned cube of dimension k at the input
-      of a round, r forward rounds sum to zero if (p-2)^(r-1) < k(p-1), and r
-      backward rounds if (p-2)^r < k(p-1); A^{-1} has almost no zero entries,
-      so (P) has no backward analogue.
+  (D) Lemma 8.7, first part, the degree asymmetry: from a cell-aligned cube
+      of dimension k at the input of a round, r forward rounds sum to zero if
+      (p-2)^(r-1) < k(p-1), and r backward rounds if (p-2)^r < k(p-1);
+      A^{-1} has almost no zero entries, so (P) has no backward analogue.
 
 This script checks (B) exactly, checks (P) on every pair at p = 5, 7 and on
 samples at p = 11, 13 with random per-cell per-round S-boxes and constants,
 checks (C), measures the inside-out zero-sums that (D) predicts, and prints
-the reach table used in the paper.
+the reach of Corollary 8.8 without round-skipping, which gives the column L of
+Table 3.  The second part of Lemma 8.7 (round-skipping), the rows of Table 6
+marked "chosen" and the six-round figure within 2^256 states are checked in
+zerosum_skip.py.
 
 Runtime about 3 minutes.
 """
@@ -228,7 +231,7 @@ def main():
         print(f"  p = {p:>2}: {check_column0(p)}")
 
     print()
-    print("Proposition 8.8: cells left inactive after two rounds from one cell")
+    print("Proposition 8.9: cells left inactive after two rounds from one cell")
     for p in [5, 7, 11, 13, 23]:
         A = radon_layer(p, 2)
         W = walks(p, A)
@@ -275,7 +278,7 @@ def main():
 
     print()
     print("=" * 78)
-    print("Reach of the zero-sums (Corollary 8.7)")
+    print("Reach of the zero-sums (Corollary 8.8, without round-skipping)")
     print("=" * 78)
     print(f"  {'p':>3} {'cells':>6} {'L any data':>11} {'k':>6} {'log2 data':>10}"
           f" {'L <= 2^256':>11} {'k':>4} {'log2 data':>10} {'k for L+1':>10}")

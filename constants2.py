@@ -27,6 +27,9 @@ constants, because that is what Proposition 6.7 needs. This script checks:
   4. whether any signed-partition subspace that is A-invariant by the
      criterion of Theorem 6.6 contains all the constants.
 
+Part (iii) of the proposition, that W_iota is not A-invariant, is now proved;
+the witness of the proof is checked at every p <= 31 in round_invariant.py.
+
 Runtime about 3 minutes.
 """
 import random

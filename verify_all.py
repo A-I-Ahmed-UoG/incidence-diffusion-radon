@@ -1,6 +1,7 @@
 """Checks the computational statements of Sections 3-8 (Appendix A).
 Run: python3 verify_all.py   (needs numpy; ~5 min)"""
-import itertools, math, cmath, numpy as np
+import itertools, math, cmath, os, sys, numpy as np
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lib import radon, rank
 
 def ok(name, cond): print(("PASS " if cond else "FAIL ") + name); assert cond
@@ -23,7 +24,7 @@ for p in [5,7,11]:
     ok(f"p={p}: rank M^2 = p, rank M^3 = 1",
        rank(M@M % p, p) == p and rank(M@M@M % p, p) == 1)
 
-# --- Cor 4.4: invertibility of M + aI and explicit inverse
+# --- Cor 4.6: invertibility of M + aI and explicit inverse
 for p in [5,7,11,13]:
     M = radon(p); I = np.eye(p*p, dtype=np.int64)
     inv_alphas = [a for a in range(p) if rank((M + a*I) % p, p) == p*p]
@@ -35,7 +36,7 @@ for p in [5,7,11,31]:
         Ai = (iv(a)*I - iv(a)**2*M + iv(a)**3*(M@M) - iv(a)**3*iv(a-1)*(M@M@M)) % p
         ok(f"p={p}, a={a}: explicit inverse", (((M + a*I) @ Ai) % p == I).all())
 
-# --- Thm 3.3 / Cor 4.6: branch numbers, exhaustive over low weights
+# --- Thm 3.3 / Cor 4.8: branch numbers, exhaustive over low weights
 def min_w_plus_wt(A, p, maxw):
     n = A.shape[0]; best = 10**9
     for w in range(1, maxw+1):
@@ -93,10 +94,48 @@ for p in [3,5,7,11,13]:
     M2 = M@M % p; M3 = M2@M % p
     ok(f"p={p}: minimal polynomial x^3(x+1)",
        M3.any() and ((M2@(M+I)) % p).any() and not ((M3@(M+I)) % p).any())
-# Prop 4.3: rank p^2 - p + 1 in characteristic != p
+# Prop 4.5: rank p^2 - p + 1 in characteristic != p
 M = radon(31)
 for q in [61, 1117]:
     ok(f"p=31: rank over F_{q} = 931", rank(M, q) == 931)
+# Prop 4.3: ker M = GRM_p(p-2,2), spanned by y^i x^j with i + j <= p-2
+for p in [3,5,7,11]:
+    M = radon(p)
+    G = np.array([[pow(y, i, p)*pow(x, j, p) % p for y in range(p) for x in range(p)]
+                  for i in range(p-1) for j in range(p-1-i)], dtype=np.int64)
+    ok(f"p={p}: ker M = GRM_p(p-2,2), dimension C(p,2)",
+       not (M@G.T % p).any() and rank(G, p) == p*p - rank(M, p) == math.comb(p, 2))
+# Prop 4.7: Algorithms 1 and 2 as printed, by their loop structure
+for p in [3,5,7,11,13,17,19]:
+    fa = p*p*(p-1) + p*p                                  # Layer: inner loops, last line
+    ia = fa + 1 + p*(p-1) + (p-1) + 3*(p-1) + 2*p*p      # u, a-1, V, Sigma, d, last loop
+    im = p*p + 3 + (1 + 2*(p-1)) + 2*p*p                  # u, constants, d, last loop
+    ok(f"p={p}: Prop 4.7 counts p^3, p^3+3p^2+3p-3 adds, 3p^2+2p+2 mults",
+       fa == p**3 and ia == p**3+3*p*p+3*p-3 and im == 3*p*p+2*p+2
+       and ia - p*p == p**3+2*p*p+3*p-3 and im - p*p == 2*p*p+2*p+2)
+# Prop 4.10: the diagonal-free identification N = 1[y' = x x' + y - e], e a non-square
+for p in [3,5,7,11]:
+    e = min(a for a in range(1, p) if a not in {x*x % p for x in range(1, p)})
+    N = np.zeros((p*p, p*p), dtype=np.int64)
+    for y in range(p):
+        for x in range(p):
+            for xx in range(p):
+                N[y*p+x, ((x*xx + y - e) % p)*p + xx] = 1
+    n = p*p; I = np.eye(n, dtype=np.int64); M = radon(p)
+    N2 = N@N % p; N3 = N2@N % p
+    ex2 = np.array([[int((x + xx) % p != 0) for yy in range(p) for xx in range(p)]
+                    for y in range(p) for x in range(p)])
+    ok(f"p={p}: N row permutation of M, no diagonal one, N^2 = 1[x+x''!=0], N^3 = -J, N^4 = 0",
+       sorted(map(tuple, N)) == sorted(map(tuple, M)) and np.trace(N) == 0
+       and (N2 == ex2).all() and (N3 == p-1).all() and not (N3@N % p).any())
+    ok(f"p={p}: ranks of N, N^2, N^3 are C(p+1,2), p, 1",
+       (rank(N, p), rank(N2, p), rank(N3, p)) == (p*(p+1)//2, p, 1))
+    good = True
+    for a in range(1, p):
+        ai = pow(a, -1, p)
+        Ai = (ai*I - ai**2*N + ai**3*N2 - ai**4*N3) % p
+        good &= (((N + a*I) @ Ai) % p == I).all()
+    ok(f"p={p}: (N + aI)^-1 = a^-1 sum (-N/a)^k for every a != 0", good)
 # Prop 6.1: (1,1) cannot reach (-1,0) in two steps
 for p in [5,7,11,13,31]:
     B = ((radon(p) + 2*np.eye(p*p, dtype=np.int64)) > 0).astype(np.int64)
@@ -112,6 +151,22 @@ def relation_dims(p, dmax=3):
     return out
 for p in [11, 13, 23, 31]:
     ok(f"p={p}: graph relations of degree <=1,2,3 have dims 0,0,2", relation_dims(p) == [0, 0, 2])
+# Prop 8.3(iii): the witness w = e_(0,0) - e_(0,-2), q = (2,0)
+for p in [5,7,11,13,17,19,23,29,31]:
+    M = radon(p); w = np.zeros(p*p, dtype=np.int64); w[0] = 1; w[p-2] = p-1
+    Mw = M@w % p; q = 2*p; iq = (p-2)*p + (p-2)
+    ok(f"p={p}: (Aw)_q = 1 and (Aw)_iota(q) = 0 for every alpha",
+       all(((Mw[q] + a*w[q]) % p, (Mw[iq] + a*w[iq]) % p) == (1, 0) for a in range(p)))
+# Prop 8.4: W_r = {g(y + t(x+1)) : g odd}, t = r+1
+for p in [5,11,17,23]:
+    M = radon(p); K3 = lambda r: np.array([pow((y + (r+1)*(x+1)) % p, 3, p) for y in range(p) for x in range(p)])
+    good = True
+    for r in range(4):
+        W = np.array([[pow((y + (r+1)*(x+1)) % p, j, p) for y in range(p) for x in range(p)]
+                      for j in range(1, p-1, 2)], dtype=np.int64)
+        good &= rank(W, p) == (p-1)//2 and not (M@W.T % p).any() \
+            and rank(np.vstack([W, K3(r)]), p) == (p-1)//2
+    ok(f"p={p}: dim W_r = (p-1)/2, W_r in ker M, kappa_r in W_r (r < 4)", good)
 # Section 8: numbers for p = 23, R = 12
 s = [0] + [pow(x, -1, 23) for x in range(1, 23)]
 w = cmath.exp(2j*math.pi/23)
@@ -123,12 +178,17 @@ ok("p=23, R=12: linear trail bound 2^-391.7", abs(144*math.log2(L23**2/23**2) + 
 ok("p=23: two-round differential bound 2^-81.0", abs(23*math.log2(2/23) + 81.0) < 0.05)
 ok("p=23, R=12: algebraic system 6348 vars, 12696 cubics, ~407 bits",
    529*12 == 6348 and 2*529*12 == 12696 and round(6348*math.log2(23/22)) == 407)
-# Corollary 8.7: zero-sum reach at p = 23
-ok("p=23: 4 rounds with k=2", 21 < 2*22)
+# Corollary 8.8: zero-sum reach at p = 23
+ok("p=23: 4 rounds with k=1 (1 back, 3 forward with round-skipping)", 21 < 1*22 and 21**(3-2) < 1*22)
 ok("p=23: 5 rounds with k=21", 21**2 < 21*22 and not 21**2 < 20*22)
+ok("p=23: 6 rounds with k=21 (2 back, 4 forward with round-skipping)", 21**2 < 21*22 and 21**(4-2) < 21*22)
 ok("p=23: 7 rounds with k=421", 21**3 < 421*22 and not 21**3 < 420*22)
 ok("p=23: 8 rounds need k >= 8841 > 529", 21**4 < 8841*22 and not 21**4 < 8840*22)
-# Proposition 8.9: limited-birthday bound for a = b = n - (p - 1)
+ok("p=23: round-skipping (k <= 22) gives no 7 or 8 rounds", not 21**3 < 22*22)
+ok("within 2^256: 6 rounds with k = p-2, at most 47^45 = 2^250.0; 7 at p=11 with 11^73 = 2^252.5",
+   abs(45*math.log2(47) - 250.0) < 0.05 and abs(73*math.log2(11) - 252.5) < 0.05
+   and all((p-2)**2 < (p-2)*(p-1) for p in [11,17,23,29,41,47]))
+# Proposition 8.10: limited-birthday bound for a = b = n - (p - 1)
 ok("p=23: limited birthday 23^11 = 2^49.8", abs(11*math.log2(23) - 49.8) < 0.05)
 ok("p=11, 13: limited birthday 2^17.3, 2^22.2", abs(5*math.log2(11) - 17.3) < 0.05 and abs(6*math.log2(13) - 22.2) < 0.05)
 ok("p=23: 57 unknown cells give >= 2^256 candidates", 57*math.log2(23) >= 256 > 56*math.log2(23))

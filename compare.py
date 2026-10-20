@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Table 4: an incidence layer against an AES-like layout.
+"""Table 4: an incidence layer against an AES-like layout, and against
+layouts over F_{p^2}; the F_{p^2} rows of Table 1.
 
 At a state of n cells over F_p the standard wide-trail alternative is not one
 large MDS matrix but a layout of t-cell MDS blocks with a ShiftRows-style
@@ -18,8 +19,38 @@ limits the AES-like column height.
 Costs.  A t x t MDS block costs t^2 multiplications and t(t-1) additions;
 n/t blocks per round give n*t multiplications and n*(t-1) additions.  The
 incidence layer costs p^3 additions and p^2 multiplications for the whole
-state of p^2 cells (Proposition 4.5), so p additions and 1 multiplication per
+state of p^2 cells (Proposition 4.7), so p additions and 1 multiplication per
 cell.  A ShiftRows-style permutation is free.
+
+The second part prints Table 4 in its long form, one row per p and layout,
+every column in cells of F_p:
+
+  inc   M + alpha I on p^2 cells.
+  aesp  AES-like, t x t MDS blocks over F_p, t = (p+1)/2, on t*floor(p^2/t)
+        cells (the layout above).
+  mds2  one n x n MDS matrix over F_{p^2}, n = (p^2-1)/2 cells of F_{p^2}
+        (n <= (p^2+1)/2, so a Reed-Solomon or Cauchy matrix exists), read as
+        an F_p-linear map on 2n = p^2 - 1 cells of F_p.
+  aes2  AES-like with b MDS blocks of t cells over F_{p^2}, t the largest
+        with t^2 <= (p^2-1)/2 and b = floor(((p^2-1)/2)/t) >= t, so that the
+        cell permutation can send the t cells of a block to t distinct
+        blocks; 2tb cells of F_p.
+
+An active cell of F_{p^2} holds one or two active cells of F_p, so an
+F_{p^2}-MDS block of t cells has branch number between t+1 and 2t+1 in cells
+of F_p (the upper end is the Singleton bound on 2t cells), and only t+1 is
+guaranteed.  The linear branch number has the same bound: the F_p-transpose
+is, up to a change of basis inside each cell, the F_p-image of the
+F_{p^2}-transpose, which is again MDS.  The S-boxes act on cells of F_p and
+keep a cell of F_{p^2} active exactly when it was, so the four-round argument
+runs in cells of F_{p^2}: (t+1)^2 active S-boxes for aes2, 2(n+1) for mds2.
+
+Costs over F_{p^2}: a product by a fixed c = a + b w, w^2 = d, is
+(ax + (bd)y) + (bx + ay)w, that is 4 multiplications and 2 additions (bd
+precomputed), and an addition is 2 additions.  A t x t block then costs
+4t^2 multiplications and 2t(2t-1) additions, the count of a dense 2t x 2t
+matrix over F_p.  The hull column is (B_l - 1) * 2 log2(L/p) with the
+guaranteed B_l.
 
 Runtime a few seconds.
 """
@@ -74,6 +105,66 @@ def row(p):
                 mul_mds=mul_mds, add_mds=add_mds)
 
 
+def rows_long(p):
+    """The four layouts of the long form of Table 4."""
+    llp = 2 * math.log2(lin_exact(p) / p)
+    n = p * p
+    out = [dict(lay='inc', cells=n, block=n, B=p + 1, act4=2 * (p + 1),
+                mul=n, add=p * n, hull=p * llp)]
+    t = (p + 1) // 2
+    nm = t * (n // t)
+    out.append(dict(lay='aesp', cells=nm, block=t, B=t + 1, act4=(t + 1) ** 2,
+                    mul=nm * t, add=nm * (t - 1), hull=t * llp))
+    m = (p * p - 1) // 2
+    assert m <= (p * p + 1) // 2
+    out.append(dict(lay='mds2', cells=2 * m, block=2 * m, B=m + 1, Bmax=2 * m + 1,
+                    act4=2 * (m + 1), mul=4 * m * m, add=2 * m * (2 * m - 1),
+                    hull=m * llp))
+    t2 = math.isqrt(m)
+    b = m // t2
+    assert b >= t2
+    out.append(dict(lay='aes2', cells=2 * t2 * b, block=2 * t2, B=t2 + 1,
+                    Bmax=2 * t2 + 1, act4=(t2 + 1) ** 2, mul=b * 4 * t2 * t2,
+                    add=b * 2 * t2 * (2 * t2 - 1), hull=t2 * llp, t2=t2, b=b))
+    return out
+
+
+def long_form(primes):
+    print("=" * 96)
+    print("Table 4, long form: the incidence layer against three layouts, in cells of F_p")
+    print("=" * 96)
+    ok = True
+    for p in primes:
+        r = row(p)
+        inc, aesp = rows_long(p)[:2]
+        chk = [(r['act4_inc'], inc['act4']), (r['act4_mds'], aesp['act4']),
+               (r['mul_inc'], inc['mul']), (r['mul_mds'], aesp['mul']),
+               (r['add_inc'], inc['add']), (r['add_mds'], aesp['add']),
+               (round(r['hull_inc'], 1), round(inc['hull'], 1)),
+               (round(r['hull_mds'], 1), round(aesp['hull'], 1))]
+        ok &= all(a == b for a, b in chk)
+    print(f"  inc and aesp rows agree with the tables above at every p: {ok}")
+    assert ok
+    print()
+    print(f"{'p':>3} {'layout':>6} {'cells':>6} {'block':>6} {'B>=':>5} {'Bmax':>5} "
+          f"{'act4>=':>7} {'mult':>9} {'add':>9} {'lg hull<=':>10}")
+    for p in primes:
+        for r in rows_long(p):
+            print(f"{p:>3} {r['lay']:>6} {r['cells']:>6} {r['block']:>6} {r['B']:>5} "
+                  f"{r.get('Bmax', r['B']):>5} {r['act4']:>7} {r['mul']:>9} {r['add']:>9} "
+                  f"{r['hull']:>10.1f}"
+                  + (f"   (t={r['t2']} F_p2 cells, b={r['b']} blocks)" if 't2' in r else ''))
+        print()
+    print("Table 1 rows (F_p cells, N = state size):")
+    print("  F_p2-MDS used F_p-linearly: N even, N <= p^2+1, N/2+1 <= B <= N+1, row weight N/2..N")
+    print("  AES-like F_p2 blocks of 2t F_p cells: t <= (p^2+1)/2, per-layer t+1 <= B <= 2t+1")
+    print()
+    r = {x['lay']: x for x in rows_long(23)}
+    for k in ['aesp', 'mds2', 'aes2']:
+        print(f"p=23 {k}: mult ratio {r[k]['mul']/r['inc']['mul']:.1f}, add ratio inc/{k} "
+              f"{r['inc']['add']/r[k]['add']:.2f}, act4 ratio {r[k]['act4']/r['inc']['act4']:.2f}")
+
+
 def main():
     print("=" * 96)
     print("Incidence layer on p^2 cells vs an AES-like layout of "
@@ -121,6 +212,8 @@ def main():
     print("  incidence layer's case rests on the multiplication count, on the")
     print("  branch number following from a theorem rather than a search, and")
     print("  on there being one global map instead of blocks plus a shuffle.")
+    print()
+    long_form([11, 17, 23, 29, 41, 47])
 
 
 if __name__ == "__main__":

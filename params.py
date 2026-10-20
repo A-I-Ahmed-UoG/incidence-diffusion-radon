@@ -1,9 +1,9 @@
 """Table of design parameters for the instances of Section 8.
 
-R_tr  : least even R with the trail bounds of Theorem 8.4 past 2^-256;
+R_tr  : least even R with the trail bounds of Theorem 8.5 past 2^-256;
 R_cnt : least even R at which counting excludes a rebound on the permutation
         (see rebound.py);
-L     : the longest zero-sum at any data complexity (Corollary 8.7,
+L     : the longest zero-sum at any data complexity (Corollary 8.8,
         see singlepath.py);
 R     : the adopted round count, max(R_tr, 12).
 DT, LT are the trail bounds at the adopted R; hull is the two-round bound of

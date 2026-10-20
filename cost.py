@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Checks Algorithms 1-2 and the operation counts of Proposition 4.5.
+"""Checks Algorithms 1-2 and the operation counts of Proposition 4.7.
 
 The forward layer is evaluated line by line.  The inverse is evaluated
 through the closed forms of Proposition 4.1: M^2 v and M^3 v are constant on
@@ -13,6 +13,10 @@ dense linear algebra over F_p, and the counts against the formulas
 
     forward:   p^2 (p-1) + p^2  additions,   p^2      multiplications
     inverse:   p^2 (p-1) + O(p^2) additions, 2p^2 + O(p) multiplications
+
+The inverse here skips the shift by zero inside Layer(w, 0), as Proposition
+4.7 says an implementation does; the exact counts of Algorithms 1 and 2 as
+printed are checked in cost_literal.py.
 
 Runtime about 1 minute.
 """
@@ -46,7 +50,7 @@ def forward(v, alpha, p, cnt):
 
 
 def inverse(w, alpha, p, cnt):
-    """(M + alpha I)^{-1} w through the inverse formula of Corollary 4.4."""
+    """(M + alpha I)^{-1} w through the inverse formula of Corollary 4.6."""
     ai = pow(alpha, p - 2, p)
     am1 = pow((alpha - 1) % p, p - 2, p)
     cnt.inv += 2
